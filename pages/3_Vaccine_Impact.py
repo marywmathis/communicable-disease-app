@@ -180,24 +180,27 @@ with tab1:
 ################################################################################
 # TAB 2 — FIXED SEIR VS EXPONENTIAL GROWTH
 ################################################################################
+################################################################################
+# TAB 2 — SEIR VS EXPONENTIAL GROWTH (FINAL FIX — NO transform_fold)
+################################################################################
 with tab2:
 
     st.subheader("SEIR vs Exponential Growth")
 
     st.write("""
-    **SEIR Definitions**  
-    - S: Susceptible  
-    - E: Exposed (infected but not yet infectious)  
-    - I: Infectious  
-    - R: Recovered  
+    **SEIR Model Definitions**
+    - **S** = Susceptible  
+    - **E** = Exposed  
+    - **I** = Infectious  
+    - **R** = Recovered  
     """)
 
-    # Inputs
+    # User inputs
     days = st.slider("Simulation days", 30, 200, 120)
     incubation = st.slider("Incubation period (days)", 1, 14, 4)
     infectious_period = st.slider("Infectious period (days)", 1, 20, 6)
 
-    # Initial values
+    # SEIR parameters
     N = 1_000_000
     I0, E0 = 10, 5
     S0 = N - I0 - E0
@@ -206,10 +209,7 @@ with tab2:
     sigma = 1 / incubation
     gamma = 1 / infectious_period
 
-    S = [S0]
-    E = [E0]
-    I = [I0]
-    R = [0]
+    S, E, I, R = [S0], [E0], [I0], [0]
 
     for t in range(days):
         new_E = beta * S[-1] * I[-1] / N
@@ -221,6 +221,7 @@ with tab2:
         I.append(I[-1] + new_I - new_R)
         R.append(R[-1] + new_R)
 
+    # Build DataFrame
     df = pd.DataFrame({
         "Day": range(days + 1),
         "Susceptible": S,
@@ -229,39 +230,40 @@ with tab2:
         "Recovered": R
     })
 
-    # FIXED Altair SEIR Chart
+    # 🔥 FIX: Melt BEFORE passing to Altair — safest for v6
+    df_long = df.melt(
+        id_vars="Day",
+        value_vars=["Susceptible", "Exposed", "Infectious", "Recovered"],
+        var_name="State",
+        value_name="Population"
+    )
+
+    # Clean, safe Altair chart (no fold, no reserved names)
     chart = (
-        alt.Chart(df)
-        .transform_fold(
-            ["Susceptible", "Exposed", "Infectious", "Recovered"],
-            as_=["State", "Population"]   # IMPORTANT FIX: Avoid "Value"
-        )
+        alt.Chart(df_long)
         .mark_line()
         .encode(
             x=alt.X("Day:Q", title="Day"),
             y=alt.Y("Population:Q", title="Population"),
             color=alt.Color(
                 "State:N",
-                scale=alt.Scale(
-                    range=[
-                        "#2E86C1",  # S
-                        "#F1C40F",  # E
-                        "#E74C3C",  # I
-                        "#27AE60",  # R
-                    ]
-                ),
-                title="SEIR State"
+                title="SEIR State",
+                scale=alt.Scale(range=[
+                    "#2E86C1",  # S
+                    "#F1C40F",  # E
+                    "#E74C3C",  # I
+                    "#27AE60",  # R
+                ])
             ),
-            tooltip=["Day", "State", "Population"]
+            tooltip=["Day:Q", "State:N", "Population:Q"]
         )
         .properties(
             height=500,
-            title="SEIR Epidemic Curve (No Errors)"
+            title="SEIR Epidemic Curve (Validated for Altair v6)"
         )
     )
 
     st.altair_chart(chart, use_container_width=True)
-
 ################################################################################
 # TAB 3 — TRANSMISSION TREE
 ################################################################################
@@ -338,3 +340,4 @@ with tab3:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
