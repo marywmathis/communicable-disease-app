@@ -198,12 +198,16 @@ with tab2:
     • **R** = Recovered/Removed  
     """)
 
-    # Inputs
+    # -----------------------
+    # User inputs
+    # -----------------------
     days = st.slider("Simulation days", 30, 200, 120)
     incubation = st.slider("Incubation period (days)", 1, 14, 4)
     infectious_period = st.slider("Infectious period (days)", 1, 20, 6)
 
-    # Initial conditions
+    # -----------------------
+    # SEIR parameters
+    # -----------------------
     N = 1_000_000
     I0, E0 = 10, 5
     S0 = N - I0 - E0
@@ -227,6 +231,9 @@ with tab2:
         I.append(I[-1] + new_I - new_R)
         R.append(R[-1] + new_R)
 
+    # -----------------------
+    # Build dataframe
+    # -----------------------
     df = pd.DataFrame({
         "Day": range(days + 1),
         "Susceptible": S,
@@ -235,6 +242,10 @@ with tab2:
         "Recovered": R
     })
 
+    # -----------------------
+    # FIX: transform_folds must come BEFORE encoding
+    # And x must be a real column ("Day"), not "index"
+    # -----------------------
     chart = (
         alt.Chart(df)
         .transform_fold(
@@ -249,10 +260,15 @@ with tab2:
                 "State:N",
                 title="SEIR State",
                 scale=alt.Scale(
-                    range=["#2E86C1", "#F1C40F", "#E74C3C", "#27AE60"]
+                    range=[
+                        "#2E86C1",  # S
+                        "#F1C40F",  # E
+                        "#E74C3C",  # I
+                        "#27AE60"   # R
+                    ]
                 )
             ),
-            tooltip=["Day", "State", "Value"],
+            tooltip=["Day", "State", "Value"]
         )
         .properties(
             height=500,
@@ -337,3 +353,4 @@ with tab3:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
