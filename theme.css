@@ -1,0 +1,87 @@
+/* --------------------------------------
+   Global Font & Base Styling
+-------------------------------------- */
+html, body, [class*="css"] {
+    font-family: Calibri, Arial, sans-serif;
+    font-size: 14px;
+}
+
+/* --------------------------------------
+   Header & Title Styling
+-------------------------------------- */
+h1, h2, h3 {
+    color: #6A1B9A; /* Purple teaching-friendly tone */
+    font-weight: 700;
+}
+
+h4, h5 {
+    color: #00897B; /* Teal for supportive headers */
+}
+
+/* --------------------------------------
+   Sidebar Styling
+-------------------------------------- */
+.sidebar .sidebar-content {
+    background-color: #F3E5F5; /* Light lavender */
+}
+
+/* --------------------------------------
+   Buttons & Interactive Elements
+-------------------------------------- */
+.stButton>button {
+    background-color: #7E57C2;   /* Purple */
+    color: white;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 16px;
+}
+
+.stButton>button:hover {
+    background-color: #5E35B1;
+}
+
+/* --------------------------------------
+   Sliders - Gradient Color Track
+-------------------------------------- */
+.css-1cpxqw2, .stSlider > div > div {
+    background: linear-gradient(
+        90deg,
+        #43A047 0%,     /* Green (low values) */
+        #FDD835 50%,    /* Yellow (mid) */
+        #E53935 100%    /* Red (high) */
+    ) !important;
+    height: 6px !important;
+    border-radius: 4px !important;
+}
+
+/* --------------------------------------
+   Metric Cards
+-------------------------------------- */
+.css-1v0mbdj, .stMetric {
+    border: 1px solid #CE93D8;
+    padding: 12px;
+    border-radius: 8px;
+    background-color: #F8F3FC;
+}
+
+/* --------------------------------------
+   Markdown Text Refinements
+-------------------------------------- */
+p, li {
+    line-height: 1.5em;
+    color: #303030;
+}
+
+/* --------------------------------------
+   Divider Line Styling
+-------------------------------------- */
+hr {
+    border-top: 1px solid #CE93D8;
+}
+
+/* --------------------------------------
+   Footer Caption
+-------------------------------------- */
+.caption {
+    color: #6A1B9A;
+}
