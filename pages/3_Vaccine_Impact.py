@@ -46,10 +46,10 @@ st.header("Impact of Vaccination on Disease Spread")
 
 st.write("""
 Explore:
-- How vaccination coverage affects **Rₑ**  
-- Herd immunity thresholds  
-- Exponential vs SEIR disease progression  
-- Transmission network structures  
+- How vaccination coverage affects **Rₑ**
+- Herd immunity thresholds
+- Exponential vs SEIR disease progression
+- Transmission network structures
 """)
 
 # =============================================================================
@@ -68,39 +68,28 @@ with tab1:
 
     st.subheader("Basic Vaccination Impact")
 
-    # -----------------------------------------------
     # Disease selection
-    # -----------------------------------------------
     disease = st.selectbox("Choose a disease:", list(disease_r0.keys()))
     R0 = disease_r0[disease]
     st.write(f"**Baseline R₀ for {disease}: {R0}**")
 
-    # -----------------------------------------------
-    # Initialize state variables only once
-    # -----------------------------------------------
+    # Initialize state
     if "coverage_value" not in st.session_state:
         st.session_state.coverage_value = 75
-
     if "preset_choice" not in st.session_state:
         st.session_state.preset_choice = "None"
-
     if "override_preset" not in st.session_state:
         st.session_state.override_preset = False
 
-    # -----------------------------------------------
-    # If slider changed previously → reset preset before widgets appear
-    # -----------------------------------------------
+    # Reset preset if slider changed previously
     if st.session_state.override_preset:
         st.session_state.preset_choice = "None"
         st.session_state.override_preset = False
 
     st.markdown("### Vaccination Coverage Settings")
-
     colA, colB = st.columns([2, 3])
 
-    # -----------------------------------------------
-    # PRESET → updates slider on next render
-    # -----------------------------------------------
+    # PRESET (changes slider)
     with colB:
         preset = st.radio(
             "Choose preset:",
@@ -112,9 +101,7 @@ with tab1:
             st.session_state.coverage_value = vacc_presets[preset]
             st.success(f"Using preset: **{preset} = {vacc_presets[preset]}%**")
 
-    # -----------------------------------------------
-    # SLIDER → if user changes it, preset becomes None next cycle
-    # -----------------------------------------------
+    # SLIDER (resets preset)
     with colA:
         slider_val = st.slider(
             "Vaccination Coverage (%)",
@@ -123,18 +110,13 @@ with tab1:
             value=st.session_state.coverage_value,
             key="coverage_slider"
         )
-
-        # Slider moved → mark override flag to apply next run
         if slider_val != st.session_state.coverage_value:
             st.session_state.override_preset = True
-
         st.session_state.coverage_value = slider_val
 
     coverage = st.session_state.coverage_value
 
-    # -----------------------------------------------
-    # HERD IMMUNITY THRESHOLD
-    # -----------------------------------------------
+    # Herd immunity
     herd_threshold = (1 - 1 / R0) * 100
     st.metric("Herd Immunity Threshold", f"{herd_threshold:.1f}%")
 
@@ -143,15 +125,11 @@ with tab1:
     else:
         st.warning("Population is below herd immunity threshold.")
 
-    # -----------------------------------------------
-    # EFFECTIVE Rₑ
-    # -----------------------------------------------
+    # Effective Re
     Re = R0 * (1 - coverage / 100)
     st.metric("Effective Rₑ", f"{Re:.2f}")
 
-    # -----------------------------------------------
-    # GENERATIONS & GROWTH
-    # -----------------------------------------------
+    # Growth
     generations = st.slider("Number of generations", 1, 12, 6)
 
     infected_no = [1]
@@ -161,25 +139,16 @@ with tab1:
         infected_no.append(infected_no[-1] * R0)
         infected_yes.append(infected_yes[-1] * Re)
 
-    df_no = pd.DataFrame({"Generation": range(generations + 1),
-                          "Infected": infected_no})
-    df_yes = pd.DataFrame({"Generation": range(generations + 1),
-                           "Infected": infected_yes})
+    df_no = pd.DataFrame({"Generation": range(generations + 1), "Infected": infected_no})
+    df_yes = pd.DataFrame({"Generation": range(generations + 1), "Infected": infected_yes})
 
-    # -----------------------------------------------
-    # SCALE: Linear vs Log
-    # -----------------------------------------------
+    # Chart scale
     scale = st.radio("Chart Scale", ["Linear", "Log Scale"], horizontal=True)
 
-    y_axis = alt.Y(
-        "Infected:Q",
-        scale=alt.Scale(type="log") if scale == "Log Scale"
-                                 else alt.Scale(type="linear")
+    y_axis = alt.Y("Infected:Q",
+        scale=alt.Scale(type="log") if scale == "Log Scale" else alt.Scale(type="linear")
     )
 
-    # -----------------------------------------------
-    # CHARTS SIDE-BY-SIDE
-    # -----------------------------------------------
     chart_no = (
         alt.Chart(df_no)
         .mark_line(point=True, color="#E53935")
@@ -198,9 +167,6 @@ with tab1:
     c1.altair_chart(chart_no, use_container_width=True)
     c2.altair_chart(chart_yes, use_container_width=True)
 
-    # -----------------------------------------------
-    # SUMMARY
-    # -----------------------------------------------
     st.markdown("### Summary")
     st.write(f"""
     - **Final generation infections**  
@@ -212,18 +178,32 @@ with tab1:
       • With vaccination: {sum(infected_yes):,}
     """)
 
-
 ################################################################################
-# TAB 2 — SEIR VS EXPONENTIAL GROWTH
+# TAB 2 — SEIR VS EXPONENTIAL GROWTH (IMPROVED VERSION)
 ################################################################################
 with tab2:
 
     st.subheader("SEIR vs Exponential Growth")
 
-    days = st.slider("Simulation days", 30, 200, 120)
-    incubation = st.slider("Incubation period (days)", 1, 10, 4)
-    infectious_period = st.slider("Infectious period (days)", 1, 14, 6)
+    st.write("""
+    This model visualizes how a real epidemic progresses with:
+    - A **latent (Exposed)** period  
+    - An **infectious** period  
+    - A **recovery** process  
 
+    **SEIR State Definitions:**  
+    • **S** = Susceptible  
+    • **E** = Exposed (infected but not infectious)  
+    • **I** = Infectious  
+    • **R** = Recovered/Removed  
+    """)
+
+    # Inputs
+    days = st.slider("Simulation days", 30, 200, 120)
+    incubation = st.slider("Incubation period (days)", 1, 14, 4)
+    infectious_period = st.slider("Infectious period (days)", 1, 20, 6)
+
+    # Initial conditions
     N = 1_000_000
     I0, E0 = 10, 5
     S0 = N - I0 - E0
@@ -232,7 +212,10 @@ with tab2:
     sigma = 1 / incubation
     gamma = 1 / infectious_period
 
-    S, E, I, R = [S0], [E0], [I0], [0]
+    S = [S0]
+    E = [E0]
+    I = [I0]
+    R = [0]
 
     for t in range(days):
         new_E = beta * S[-1] * I[-1] / N
@@ -244,22 +227,40 @@ with tab2:
         I.append(I[-1] + new_I - new_R)
         R.append(R[-1] + new_R)
 
-    df = pd.DataFrame({"S": S, "E": E, "I": I, "R": R})
+    df = pd.DataFrame({
+        "Day": range(days + 1),
+        "Susceptible": S,
+        "Exposed": E,
+        "Infectious": I,
+        "Recovered": R
+    })
 
     chart = (
-        alt.Chart(df.reset_index())
+        alt.Chart(df)
+        .transform_fold(
+            ["Susceptible", "Exposed", "Infectious", "Recovered"],
+            as_=["State", "Value"]
+        )
         .mark_line()
         .encode(
-            x="index",
-            y="value:Q",
-            color="variable:N"
+            x=alt.X("Day:Q", title="Day"),
+            y=alt.Y("Value:Q", title="Population"),
+            color=alt.Color(
+                "State:N",
+                title="SEIR State",
+                scale=alt.Scale(
+                    range=["#2E86C1", "#F1C40F", "#E74C3C", "#27AE60"]
+                )
+            ),
+            tooltip=["Day", "State", "Value"],
         )
-        .transform_fold(["S", "E", "I", "R"])
-        .properties(height=500)
+        .properties(
+            height=500,
+            title="SEIR Epidemic Curve"
+        )
     )
 
     st.altair_chart(chart, use_container_width=True)
-
 
 ################################################################################
 # TAB 3 — TRANSMISSION TREE
@@ -267,12 +268,8 @@ with tab2:
 with tab3:
 
     st.subheader("Transmission Tree Visualization")
+    st.write("Shows branching spread based on effective Rₑ.")
 
-    st.write("Shows branching spread with superspreaders and vaccination stops.")
-
-    # -----------------------------------------------
-    # Tree generation function
-    # -----------------------------------------------
     def generate_tree(Re, max_gen=5, max_nodes=1000):
         G = nx.DiGraph()
         G.add_node(0, generation=0)
