@@ -6,11 +6,10 @@ from pathlib import Path
 # -------------------------------------------------
 st.set_page_config(
     page_title="Communicable Disease Spread Simulator",
+    page_icon="🦠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# -------------------------------------------------
 # LOAD CUSTOM THEME CSS
 # -------------------------------------------------
 theme_path = Path("assets/theme.css")
@@ -43,3 +42,4 @@ Use the **navigation menu on the left** to explore:
 # -------------------------------------------------
 st.markdown("---")
 st.caption("Developed for epidemiology teaching — includes R₀ presets, vaccination effects, and transmission visuals.")
+
