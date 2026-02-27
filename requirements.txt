@@ -2,5 +2,6 @@ streamlit
 altair
 pandas
 numpy
-plotly
 networkx
+plotly
+matplotlib
