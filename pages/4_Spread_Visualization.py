@@ -24,7 +24,7 @@ st.header("Spread Visualization (Animated or Node Tree)")
 
 st.markdown("""
 Use the dropdown below to switch between an **animated generation-by-generation outbreak**,  
-or a **full branching network view**.
+or a **full branching network-style node tree**.
 """)
 
 # -------------------------------------------------
@@ -38,18 +38,16 @@ mode = st.selectbox(
 # -------------------------------------------------
 # SELECT DISEASE + R₀
 # -------------------------------------------------
-disease = st.selectbox(
-    "Choose a disease:",
-    list(disease_r0.keys())
-)
-
-R0 = float(disease_r0[disease])
+disease = st.selectbox("Choose a disease:", list(disease_r0.keys()))
+R0_default = float(disease_r0[disease])
 
 R0 = st.slider(
     "R₀ (Basic Reproduction Number)",
     min_value=1.0, max_value=20.0,
-    value=R0, step=0.1
+    value=R0_default, step=0.1
 )
+
+max_gen = 8  # Maximum number of generations
 
 # -------------------------------------------------
 # ANIMATION MODE (CLICK-TO-ADVANCE)
@@ -58,9 +56,7 @@ if mode == "Animated Spread (Click to Advance)":
     
     st.subheader("Animated Spread — Click to Advance")
 
-    max_gen = 8  # Your requested maximum number of generations
-
-    # A button that increments session state each click
+    # Track generation in session state
     if "current_gen" not in st.session_state:
         st.session_state.current_gen = 0
 
@@ -70,7 +66,7 @@ if mode == "Animated Spread (Click to Advance)":
 
     st.write(f"### Showing up to Generation: {st.session_state.current_gen}")
 
-    # Compute infections for displayed generations
+    # Compute infections
     infected = [1]
     for g in range(1, st.session_state.current_gen + 1):
         infected.append(infected[-1] * R0)
@@ -98,48 +94,47 @@ if mode == "Animated Spread (Click to Advance)":
 
     st.altair_chart(chart, use_container_width=True)
 
-    st.metric(
-        "Total Infected So Far",
-        f"{int(infected[-1]):,}"
-    )
+    st.metric("Total Infected So Far", f"{int(infected[-1]):,}")
 
     st.markdown("""
     ### Teaching Notes
-    - Click *Next Generation* to show exponential growth visually.  
-    - Works extremely well in the classroom when demonstrating outbreaks.  
+    - Click *Next Generation* to illustrate exponential growth visually.  
+    - Use lower or higher R₀ values to compare diseases.  
     """)
 
 # -------------------------------------------------
-# NODE TREE MODE
+# NODE TREE VISUALIZATION MODE
 # -------------------------------------------------
 else:
     st.subheader("Node Tree Spread Visualization")
 
     st.markdown("""
-    Each circle represents an infected person.  
-    Each generation branches outward from the previous one.
-    """)
+Each circle represents an infected person.  
+Generations expand outward vertically.
+Node counts are capped to keep the browser responsive.
+""")
 
-    max_gen = 8
-
-    # Calculate number of infected per generation
+    # Compute infections per generation
     infected = [1]
     for g in range(1, max_gen + 1):
         infected.append(infected[-1] * R0)
 
-    # Create dataset for node positions
+    # Cap total nodes to prevent crashing Streamlit Cloud
+    MAX_NODES = 5000
+
+    # Build dataset
     nodes = []
     for gen in range(max_gen + 1):
-        count = int(infected[gen])
-        # Spread nodes horizontally across the chart
+        count = min(int(infected[gen]), MAX_NODES)
         x_positions = np.linspace(0, 100, count)
-        y_position = gen * 12  # vertical spacing between generations
+        y_position = gen * 12
+
         for x in x_positions:
             nodes.append([gen, x, y_position])
 
     node_df = pd.DataFrame(nodes, columns=["Generation", "x", "y"])
 
-    # Circles represent infected individuals
+    # Altair scatterplot
     node_chart = (
         alt.Chart(node_df)
         .mark_circle(size=60, opacity=0.8)
@@ -157,8 +152,9 @@ else:
     st.altair_chart(node_chart, use_container_width=True)
 
     st.markdown("""
-    ### Teaching Notes
-    - This view helps students understand **branching transmission**.  
-    - Higher R₀ = **denser and wider branching**.  
-    - Lower R₀ = more compact networks.  
-    """)
+### Teaching Notes
+- This view shows branching transmission visually.  
+- Higher R₀ produces wider, denser networks.  
+- Lower R₀ produces narrow, constrained networks.  
+- Node count is capped for smooth performance.  
+""")
