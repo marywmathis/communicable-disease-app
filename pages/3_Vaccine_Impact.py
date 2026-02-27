@@ -81,35 +81,62 @@ for g in range(1, generations + 1):
     infected_no_vax.append(infected_no_vax[-1] * R0)
     infected_vax.append(infected_vax[-1] * Re)
 
-df = pd.DataFrame({
+df_no = pd.DataFrame({
     "Generation": list(range(generations + 1)),
-    "No Vaccination": infected_no_vax,
-    "With Vaccination": infected_vax
+    "Infected": infected_no_vax
 })
 
-plot_df = df.melt(id_vars=["Generation"], var_name="Scenario", value_name="Infected")
+df_yes = pd.DataFrame({
+    "Generation": list(range(generations + 1)),
+    "Infected": infected_vax
+})
 
 # -------------------------------------------------
-# LINE CHART COMPARISON
+# LEFT CHART — NO VACCINATION
 # -------------------------------------------------
-chart = (
-    alt.Chart(plot_df)
-    .mark_line(point=True, strokeWidth=3)
+chart_no = (
+    alt.Chart(df_no)
+    .mark_line(point=True, color="#E53935", strokeWidth=3)
     .encode(
-        x="Generation:O",
-        y="Infected:Q",
-        color=alt.Color(
-            "Scenario:N",
-            scale=alt.Scale(
-                range=["#E53935", "#43A047"]  # red = no vax, green = vax
-            ),
-            legend=alt.Legend(title="Scenario")
-        )
+        x=alt.X("Generation:O", title="Generation"),
+        y=alt.Y("Infected:Q", title="Infected"),
+        tooltip=["Generation", "Infected"]
     )
-    .properties(height=400)
+    .properties(
+        width=350,
+        height=350,
+        title="No Vaccination (R₀)"
+    )
 )
 
-st.altair_chart(chart, use_container_width=True)
+# -------------------------------------------------
+# RIGHT CHART — WITH VACCINATION
+# -------------------------------------------------
+chart_yes = (
+    alt.Chart(df_yes)
+    .mark_line(point=True, color="#43A047", strokeWidth=3)
+    .encode(
+        x=alt.X("Generation:O", title="Generation"),
+        y=alt.Y("Infected:Q", title="Infected"),
+        tooltip=["Generation", "Infected"]
+    )
+    .properties(
+        width=350,
+        height=350,
+        title=f"With Vaccination (Rₑ = {Re:.2f})"
+    )
+)
+
+# -------------------------------------------------
+# DISPLAY SIDE BY SIDE
+# -------------------------------------------------
+col1, col2 = st.columns(2)
+
+with col1:
+    st.altair_chart(chart_no, use_container_width=True)
+
+with col2:
+    st.altair_chart(chart_yes, use_container_width=True)
 
 # -------------------------------------------------
 # SUMMARY STATEMENTS
@@ -120,5 +147,5 @@ st.markdown(f"""
 ### Summary
 - **No vaccination** leads to **{int(infected_no_vax[-1]):,} infections** after {generations} generations.  
 - **With {coverage}% vaccination**, infections fall to **{int(infected_vax[-1]):,}**.  
-- Effective R drops from **{R0:.1f} → {Re:.2f}**, slowing transmission dramatically.
+- Effective R drops from **{R0:.1f} → {Re:.2f}**, slowing transmission dramatically.  
 """)
