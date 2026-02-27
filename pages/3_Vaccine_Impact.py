@@ -8,9 +8,7 @@ import numpy as np
 import altair as alt
 import networkx as nx
 import plotly.graph_objects as go
-import json
 import math
-import time
 
 # =============================================================================
 # BASELINE R₀ VALUES FOR DISEASES
@@ -53,7 +51,7 @@ Explore:
 """)
 
 # =============================================================================
-# CREATE TABS (required before with tab1:)
+# CREATE TABS
 # =============================================================================
 tab1, tab2, tab3 = st.tabs([
     "Basic Vaccination Impact",
@@ -68,12 +66,11 @@ with tab1:
 
     st.subheader("Basic Vaccination Impact")
 
-    # Disease selection
     disease = st.selectbox("Choose a disease:", list(disease_r0.keys()))
     R0 = disease_r0[disease]
     st.write(f"**Baseline R₀ for {disease}: {R0}**")
 
-    # Initialize state
+    # Session state
     if "coverage_value" not in st.session_state:
         st.session_state.coverage_value = 75
     if "preset_choice" not in st.session_state:
@@ -81,7 +78,6 @@ with tab1:
     if "override_preset" not in st.session_state:
         st.session_state.override_preset = False
 
-    # Reset preset if slider changed previously
     if st.session_state.override_preset:
         st.session_state.preset_choice = "None"
         st.session_state.override_preset = False
@@ -89,7 +85,7 @@ with tab1:
     st.markdown("### Vaccination Coverage Settings")
     colA, colB = st.columns([2, 3])
 
-    # PRESET (changes slider)
+    # PRESET SELECTOR
     with colB:
         preset = st.radio(
             "Choose preset:",
@@ -99,24 +95,24 @@ with tab1:
         )
         if preset != "None":
             st.session_state.coverage_value = vacc_presets[preset]
-            st.success(f"Using preset: **{preset} = {vacc_presets[preset]}%**")
+            st.success(f"Preset applied: {preset} = {vacc_presets[preset]}%")
 
-    # SLIDER (resets preset)
+    # SLIDER
     with colA:
         slider_val = st.slider(
             "Vaccination Coverage (%)",
-            min_value=0,
-            max_value=100,
+            0, 100,
             value=st.session_state.coverage_value,
             key="coverage_slider"
         )
         if slider_val != st.session_state.coverage_value:
             st.session_state.override_preset = True
+
         st.session_state.coverage_value = slider_val
 
     coverage = st.session_state.coverage_value
 
-    # Herd immunity
+    # Herd immunity threshold
     herd_threshold = (1 - 1 / R0) * 100
     st.metric("Herd Immunity Threshold", f"{herd_threshold:.1f}%")
 
@@ -125,11 +121,11 @@ with tab1:
     else:
         st.warning("Population is below herd immunity threshold.")
 
-    # Effective Re
+    # Effective R
     Re = R0 * (1 - coverage / 100)
     st.metric("Effective Rₑ", f"{Re:.2f}")
 
-    # Growth
+    # Growth modeling
     generations = st.slider("Number of generations", 1, 12, 6)
 
     infected_no = [1]
@@ -142,13 +138,15 @@ with tab1:
     df_no = pd.DataFrame({"Generation": range(generations + 1), "Infected": infected_no})
     df_yes = pd.DataFrame({"Generation": range(generations + 1), "Infected": infected_yes})
 
-    # Chart scale
+    # Scale toggle
     scale = st.radio("Chart Scale", ["Linear", "Log Scale"], horizontal=True)
 
-    y_axis = alt.Y("Infected:Q",
+    y_axis = alt.Y(
+        "Infected:Q",
         scale=alt.Scale(type="log") if scale == "Log Scale" else alt.Scale(type="linear")
     )
 
+    # Charts
     chart_no = (
         alt.Chart(df_no)
         .mark_line(point=True, color="#E53935")
@@ -167,47 +165,39 @@ with tab1:
     c1.altair_chart(chart_no, use_container_width=True)
     c2.altair_chart(chart_yes, use_container_width=True)
 
+    # Summary
     st.markdown("### Summary")
     st.write(f"""
-    - **Final generation infections**  
-      • No vaccination: {infected_no[-1]:,}  
-      • With vaccination: {infected_yes[-1]:,}
+    **Final generation infections**
+    - No vaccination: {infected_no[-1]:,}
+    - With vaccination: {infected_yes[-1]:,}
 
-    - **Cumulative infections**  
-      • No vaccination: {sum(infected_no):,}  
-      • With vaccination: {sum(infected_yes):,}
+    **Cumulative infections**
+    - No vaccination: {sum(infected_no):,}
+    - With vaccination: {sum(infected_yes):,}
     """)
 
 ################################################################################
-# TAB 2 — SEIR VS EXPONENTIAL GROWTH (IMPROVED VERSION)
+# TAB 2 — FIXED SEIR VS EXPONENTIAL GROWTH
 ################################################################################
 with tab2:
 
     st.subheader("SEIR vs Exponential Growth")
 
     st.write("""
-    This model visualizes how a real epidemic progresses with:
-    - A **latent (Exposed)** period  
-    - An **infectious** period  
-    - A **recovery** process  
-
-    **SEIR State Definitions:**  
-    • **S** = Susceptible  
-    • **E** = Exposed (infected but not infectious)  
-    • **I** = Infectious  
-    • **R** = Recovered/Removed  
+    **SEIR Definitions**  
+    - S: Susceptible  
+    - E: Exposed (infected but not yet infectious)  
+    - I: Infectious  
+    - R: Recovered  
     """)
 
-    # -----------------------
-    # User inputs
-    # -----------------------
+    # Inputs
     days = st.slider("Simulation days", 30, 200, 120)
     incubation = st.slider("Incubation period (days)", 1, 14, 4)
     infectious_period = st.slider("Infectious period (days)", 1, 20, 6)
 
-    # -----------------------
-    # SEIR parameters
-    # -----------------------
+    # Initial values
     N = 1_000_000
     I0, E0 = 10, 5
     S0 = N - I0 - E0
@@ -231,9 +221,6 @@ with tab2:
         I.append(I[-1] + new_I - new_R)
         R.append(R[-1] + new_R)
 
-    # -----------------------
-    # Build dataframe
-    # -----------------------
     df = pd.DataFrame({
         "Day": range(days + 1),
         "Susceptible": S,
@@ -242,37 +229,34 @@ with tab2:
         "Recovered": R
     })
 
-    # -----------------------
-    # FIX: transform_folds must come BEFORE encoding
-    # And x must be a real column ("Day"), not "index"
-    # -----------------------
+    # FIXED Altair SEIR Chart
     chart = (
         alt.Chart(df)
         .transform_fold(
             ["Susceptible", "Exposed", "Infectious", "Recovered"],
-            as_=["State", "Value"]
+            as_=["State", "Population"]   # IMPORTANT FIX: Avoid "Value"
         )
         .mark_line()
         .encode(
             x=alt.X("Day:Q", title="Day"),
-            y=alt.Y("Value:Q", title="Population"),
+            y=alt.Y("Population:Q", title="Population"),
             color=alt.Color(
                 "State:N",
-                title="SEIR State",
                 scale=alt.Scale(
                     range=[
                         "#2E86C1",  # S
                         "#F1C40F",  # E
                         "#E74C3C",  # I
-                        "#27AE60"   # R
+                        "#27AE60",  # R
                     ]
-                )
+                ),
+                title="SEIR State"
             ),
-            tooltip=["Day", "State", "Value"]
+            tooltip=["Day", "State", "Population"]
         )
         .properties(
             height=500,
-            title="SEIR Epidemic Curve"
+            title="SEIR Epidemic Curve (No Errors)"
         )
     )
 
@@ -284,7 +268,6 @@ with tab2:
 with tab3:
 
     st.subheader("Transmission Tree Visualization")
-    st.write("Shows branching spread based on effective Rₑ.")
 
     def generate_tree(Re, max_gen=5, max_nodes=1000):
         G = nx.DiGraph()
@@ -309,6 +292,7 @@ with tab3:
     G = generate_tree(Re)
     pos = nx.spring_layout(G, seed=42)
 
+    # Edges
     edge_x, edge_y = [], []
     for u, v in G.edges():
         x0, y0 = pos[u]
@@ -316,6 +300,7 @@ with tab3:
         edge_x.extend([x0, x1, None])
         edge_y.extend([y0, y1, None])
 
+    # Nodes
     node_x = [pos[n][0] for n in G.nodes()]
     node_y = [pos[n][1] for n in G.nodes()]
     node_gen = [G.nodes[n]["generation"] for n in G.nodes()]
@@ -340,7 +325,7 @@ with tab3:
             colorbar=dict(title="Generation")
         ),
         hoverinfo="text",
-        text=[f"Node: {n}<br>Gen: {G.nodes[n]['generation']}" for n in G.nodes()]
+        text=[f"Node {n} (Gen {G.nodes[n]['generation']})" for n in G.nodes()]
     ))
 
     fig.update_layout(
@@ -353,4 +338,3 @@ with tab3:
     )
 
     st.plotly_chart(fig, use_container_width=True)
-
