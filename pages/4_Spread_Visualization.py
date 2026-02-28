@@ -29,48 +29,24 @@ disease_r0 = {
 # ============================================================
 # PAGE HEADER
 # ============================================================
-st.header("Spread Visualization (Animated, Node Tree, and SEIR Model)")
+st.header("Epidemic Spread Visualization Suite")
 
-st.markdown("""
-Explore three epidemic models:
-
-### **1. Animated Spread**
-Shows generation-by-generation exponential growth.
-
-### **2. Node Tree Transmission Map**
-Includes:
-- Superspreader highlighting  
-- Vaccination pruning  
-- Effective Rₑ  
-- Curved edges  
-- Radial or hierarchical layouts  
-- **Safe Export (HTML + JSON)**  
-
-### **3. SEIR Model**
-S–E–I–R compartmental dynamics with a clear legend.
-""")
-
-# ============================================================
-# MODE SELECTOR
-# ============================================================
 mode = st.selectbox(
     "Choose visualization mode:",
-    ["Animated Spread (Click to Advance)", "Node Tree Spread", "SEIR Model"]
+    ["Animated Spread", "Node Tree Spread", "SEIR Model"]
 )
 
 # ============================================================
-# DISEASE + R0 INPUTS
+# DISEASE + R0
 # ============================================================
 disease = st.selectbox("Choose a disease:", list(disease_r0.keys()))
 R0_default = disease_r0[disease]
-
 R0_base = st.slider("Baseline R₀", 1.0, 20.0, float(R0_default), 0.1)
-max_gen = 8
 
 # ============================================================
 # EFFECTIVE Rₑ CONTROLS
 # ============================================================
-st.subheader("Rₑ (Effective Reproduction Number) Controls")
+st.subheader("Rₑ Controls")
 
 vacc_eff = st.slider("Vaccination effectiveness (%)", 0, 100, 50)
 mask_eff = st.slider("Mask effectiveness (%)", 0, 100, 30)
@@ -82,11 +58,31 @@ Re = max(0.1, Re)
 st.metric("Effective Rₑ", f"{Re:.2f}")
 
 # ============================================================
-# 1. ANIMATED GENERATION-BY-GENERATION MODE
+# ADVANCED EPIDEMIOLOGIC TIMING PANEL
 # ============================================================
-if mode == "Animated Spread (Click to Advance)":
+with st.expander("Advanced Epidemiologic Timing"):
 
-    st.subheader("Animated Spread — Click to Advance")
+    incubation_days = st.slider("Incubation Period (days)", 1, 14, 4)
+    infectious_days = st.slider("Infectious Period (days)", 1, 20, 6)
+
+    generation_interval = incubation_days + (infectious_days / 2)
+    doubling_time = math.log(2) / math.log(Re) if Re > 1 else None
+
+    st.write(f"**Estimated Generation Interval:** {generation_interval:.1f} days")
+
+    if doubling_time:
+        st.write(f"**Approximate Doubling Time:** {doubling_time * generation_interval:.1f} days")
+    else:
+        st.write("**Doubling Time:** Not applicable (Rₑ ≤ 1)")
+
+# ============================================================
+# 1. ANIMATED SPREAD
+# ============================================================
+if mode == "Animated Spread":
+
+    st.subheader("Generation-by-Generation Spread")
+
+    max_gen = 8
 
     if "anim_gen" not in st.session_state:
         st.session_state.anim_gen = 0
@@ -95,13 +91,16 @@ if mode == "Animated Spread (Click to Advance)":
         st.session_state.anim_gen = min(max_gen, st.session_state.anim_gen + 1)
 
     gen = st.session_state.anim_gen
-    st.write(f"### Showing Generation 0 → {gen}")
+    st.write(f"Showing Generation 0 → {gen}")
 
     infected = [1]
     for g in range(1, gen + 1):
         infected.append(infected[-1] * Re)
 
-    df = pd.DataFrame({"Generation": list(range(gen + 1)), "Infected": infected})
+    df = pd.DataFrame({
+        "Generation": list(range(gen + 1)),
+        "Infected": infected
+    })
 
     chart = (
         alt.Chart(df)
@@ -109,88 +108,35 @@ if mode == "Animated Spread (Click to Advance)":
         .encode(
             x="Generation:O",
             y="Infected:Q",
-            color=alt.Color("Infected:Q", scale=alt.Scale(scheme="redyellowgreen")),
+            color=alt.Color("Infected:Q", scale=alt.Scale(scheme="redyellowgreen"))
         )
         .properties(height=400)
     )
 
     st.altair_chart(chart, use_container_width=True)
-    st.metric("Total Infected", f"{int(infected[-1]):,}")
 
-# ---------------------------------------------------
-# GENERATION TIMING MODEL
-# ---------------------------------------------------
+    timing_df = pd.DataFrame({
+        "Generation": list(range(gen + 1)),
+        "Approx Days": [round(g * generation_interval, 1) for g in range(gen + 1)]
+    })
 
-st.markdown("### Generation Timing Model")
+    st.dataframe(timing_df, use_container_width=True)
 
-# Use same sliders as SEIR if available
-incubation = st.slider("Incubation Period (days)", 1, 14, 4, key="tree_incubation")
-infectious_period = st.slider("Infectious Period (days)", 1, 20, 6, key="tree_infectious")
-
-generation_interval = incubation + (infectious_period / 2)
-
-st.info(f"Estimated Generation Interval: **{generation_interval:.1f} days**")
-
-max_generation = max(node_gen)
-
-generation_days = {
-    g: round(g * generation_interval, 1)
-    for g in range(max_generation + 1)
-}
-
-timing_df = pd.DataFrame({
-    "Generation": list(generation_days.keys()),
-    "Approx Days Since Index Case": list(generation_days.values())
-})
-
-st.dataframe(timing_df, use_container_width=True)
 # ============================================================
-# 2. NODE TREE SPREAD MODE
+# 2. NODE TREE SPREAD
 # ============================================================
 elif mode == "Node Tree Spread":
 
-    st.subheader("Node Tree Transmission Map")
-
-    # UI Controls
-    layout_mode = st.radio("Layout", ["Hierarchical (CDC-style)", "Radial"])
-    animation_mode = st.radio("Animation", ["Manual", "Auto-Play", "None"])
-
-    show_labels = st.checkbox("Show node labels", False)
-    highlight_superspreader_paths = st.checkbox("Highlight superspreader paths", True)
+    st.subheader("Transmission Tree")
 
     superspreader_pct = st.slider("Superspreader %", 0, 50, 10)
-    vacc_pct = st.slider("Vaccination % (stops transmission)", 0, 80, 20)
+    vacc_pct = st.slider("Vaccination % (blocks transmission)", 0, 80, 20)
+    max_gen = 8
 
-    horiz = st.slider("Horizontal spacing", 0.2, 3.0, 1.0)
-    vert = st.slider("Vertical spacing", 0.3, 2.0, 1.0)
-    radial_scale = st.slider("Radial scale", 0.3, 2.0, 1.0)
-
-    # Track generation
-    if "tree_gen" not in st.session_state:
-        st.session_state.tree_gen = 0
-
-    if animation_mode == "Manual":
-        if st.button("Next Generation →"):
-            st.session_state.tree_gen = min(max_gen, st.session_state.tree_gen + 1)
-    elif animation_mode == "Auto-Play":
-        play = st.checkbox("Play", False)
-        if play:
-            for g in range(st.session_state.tree_gen, max_gen + 1):
-                st.session_state.tree_gen = g
-                time.sleep(0.65)
-                st.experimental_rerun()
-    else:
-        st.session_state.tree_gen = max_gen
-
-    curr_gen = st.session_state.tree_gen
-    st.write(f"### Showing Generations 0 → {curr_gen}")
-
-    # ============================================================
-    # TREE GENERATION FUNCTION
-    # ============================================================
     def generate_tree(Re, max_gen, superspreader_pct, vacc_pct, max_nodes=2000):
+
         G = nx.DiGraph()
-        G.add_node(0, generation=0, parent=None, vacc=False, super=False)
+        G.add_node(0, generation=0)
         node_id = 1
         current = [0]
 
@@ -198,28 +144,19 @@ elif mode == "Node Tree Spread":
             next_gen = []
             for parent in current:
 
-                if G.nodes[parent]["vacc"]:
-                    continue
-
-                is_super = np.random.rand() < (superspreader_pct / 100)
+                is_super = np.random.rand() < superspreader_pct / 100
                 newR = int(Re * (3 if is_super else 1))
                 newR = max(1, newR)
 
                 for _ in range(newR):
-
                     if node_id > max_nodes:
                         return G
 
-                    vacc_status = np.random.rand() < (vacc_pct / 100)
-
-                    G.add_node(node_id,
-                               generation=gen,
-                               parent=parent,
-                               vacc=vacc_status,
-                               super=is_super)
+                    vaccinated = np.random.rand() < vacc_pct / 100
+                    G.add_node(node_id, generation=gen, vacc=vaccinated)
                     G.add_edge(parent, node_id)
 
-                    if not vacc_status:
+                    if not vaccinated:
                         next_gen.append(node_id)
 
                     node_id += 1
@@ -228,199 +165,84 @@ elif mode == "Node Tree Spread":
 
         return G
 
-    G = generate_tree(Re, curr_gen, superspreader_pct, vacc_pct)
+    G = generate_tree(Re, max_gen, superspreader_pct, vacc_pct)
 
-    # ============================================================
-    # LAYOUT FUNCTIONS
-    # ============================================================
-    def layout_hierarchy(G, horiz, vert):
-        pos = {}
-        gens = {}
-        for n, d in G.nodes(data=True):
-            gens.setdefault(d["generation"], []).append(n)
-        for gen, nodes in gens.items():
-            xs = np.linspace(-horiz, horiz, len(nodes))
-            for i, n in enumerate(nodes):
-                pos[n] = (xs[i], -gen * vert)
-        return pos
+    # SIMPLE HIERARCHICAL LAYOUT (NO SCIPY REQUIRED)
+    pos = {}
+    gens = {}
+    for n, d in G.nodes(data=True):
+        gens.setdefault(d["generation"], []).append(n)
 
-    def layout_radial(G, radial_scale):
-        pos = {}
-        gens = {}
-        for n, d in G.nodes(data=True):
-            gens.setdefault(d["generation"], []).append(n)
-        for gen, nodes in gens.items():
-            radius = (gen + 0.5) * radial_scale
-            angles = np.linspace(0, 2 * np.pi, len(nodes), endpoint=False)
-            for angle, n in zip(angles, nodes):
-                pos[n] = (radius * math.cos(angle), radius * math.sin(angle))
-        return pos
+    for gen, nodes in gens.items():
+        xs = np.linspace(-1, 1, len(nodes))
+        for i, n in enumerate(nodes):
+            pos[n] = (xs[i], -gen)
 
-    # ============================================================
-    # CURVED EDGE PATH
-    # ============================================================
-    def curved_edge(x0, y0, x1, y1, steps=20):
-        xm, ym = (x0 + x1) / 2, (y0 + y1) / 2 - 0.15
-        xs, ys = [], []
-        for t in np.linspace(0, 1, steps):
-            bx = (1 - t) ** 2 * x0 + 2 * (1 - t) * t * xm + t ** 2 * x1
-            by = (1 - t) ** 2 * y0 + 2 * (1 - t) * t * ym + t ** 2 * y1
-            xs.append(bx); ys.append(by)
-        return xs + [None], ys + [None]
+    edge_x, edge_y = [], []
+    for u, v in G.edges():
+        edge_x.extend([pos[u][0], pos[v][0], None])
+        edge_y.extend([pos[u][1], pos[v][1], None])
 
-    # ============================================================
-    # DRAW TREE
-    # ============================================================
-    def draw_tree(G, pos, show_labels, highlight):
+    node_x = [pos[n][0] for n in G.nodes()]
+    node_y = [pos[n][1] for n in G.nodes()]
+    node_gen = [G.nodes[n]["generation"] for n in G.nodes()]
 
-        edge_x, edge_y = [], []
+    fig = go.Figure()
 
-        for u, v in G.edges():
-            xs, ys = curved_edge(pos[u][0], pos[u][1], pos[v][0], pos[v][1])
+    fig.add_trace(go.Scatter(
+        x=edge_x, y=edge_y,
+        mode="lines",
+        line=dict(width=1, color="gray"),
+        hoverinfo="none"
+    ))
 
-            edge_x += xs
-            edge_y += ys
-
-        edge_trace = go.Scatter(
-            x=edge_x,
-            y=edge_y,
-            mode="lines",
-            line=dict(width=1, color="#BBBBBB"),
-            hoverinfo="none"
+    fig.add_trace(go.Scatter(
+        x=node_x, y=node_y,
+        mode="markers",
+        marker=dict(
+            size=12,
+            color=node_gen,
+            colorscale="Viridis",
+            showscale=True,
+            colorbar=dict(title="Generation")
         )
+    ))
 
-        node_x, node_y, colors, sizes, hovers = [], [], [], [], []
-
-        for n, d in G.nodes(data=True):
-            x, y = pos[n]
-            node_x.append(x); node_y.append(y)
-
-            if d["vacc"]:
-                colors.append(-1)
-            else:
-                colors.append(d["generation"])
-
-            sizes.append(22 if d["super"] else 14)
-
-            hovers.append(
-                f"<b>Node:</b> {n}<br>"
-                f"Generation: {d['generation']}<br>"
-                f"Superspreader: {d['super']}<br>"
-                f"Vaccinated: {d['vacc']}<br>"
-                f"Parent: {d['parent']}"
-            )
-
-        colorscale = [
-            [0.00, "#00AA00"],  # vaccinated
-            [0.01, "#FFFF00"],  # gen0
-            [0.25, "#FFB000"],
-            [0.50, "#FF0000"],
-            [0.75, "#8B00FF"],
-            [1.00, "#002080"]
-        ]
-
-        node_trace = go.Scatter(
-            x=node_x, y=node_y,
-            mode="markers+text" if show_labels else "markers",
-            text=[str(n) for n in G.nodes()] if show_labels else None,
-            textposition="top center",
-            hovertext=hovers,
-            hoverinfo="text",
-            marker=dict(
-                size=sizes,
-                color=colors,
-                colorscale=colorscale,
-                cmin=-1,
-                cmax=max(colors),
-                showscale=True,
-                colorbar=dict(
-                    title="Legend",
-                    tickvals=list(range(-1, max(colors) + 1)),
-                    ticktext=["Vaccinated"] +
-                             [f"Gen {i}" for i in range(max(colors) + 1)],
-                ),
-                line=dict(width=1, color="black")
-            )
-        )
-
-        fig = go.Figure(data=[edge_trace, node_trace])
-
-        fig.update_layout(
-            showlegend=False,
-            plot_bgcolor="white",
-            xaxis=dict(visible=False),
-            yaxis=dict(visible=False),
-            margin=dict(l=20, r=20, t=40, b=20)
-        )
-
-        return fig
-
-    # ============================================================
-    # BUILD FIGURE
-    # ============================================================
-    pos = layout_hierarchy(G, horiz, vert) if layout_mode.startswith("Hierarchical") else layout_radial(G, radial_scale)
-    fig = draw_tree(G, pos, show_labels, highlight_superspreader_paths)
+    fig.update_layout(
+        showlegend=False,
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        height=600
+    )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # ============================================================
-    # SAFE EXPORT SECTION (HTML + JSON ONLY)
-    # ============================================================
-    st.subheader("Export Options")
+    # GENERATION TIMING TABLE
+    timing_df = pd.DataFrame({
+        "Generation": list(range(max_gen + 1)),
+        "Approx Days Since Index Case":
+            [round(g * generation_interval, 1) for g in range(max_gen + 1)]
+    })
 
-    export_fmt = st.selectbox("Choose export format", ["Interactive HTML", "JSON"])
-
-    if st.button("Export"):
-
-        if export_fmt == "JSON":
-            data = json.dumps(nx.node_link_data(G), indent=2)
-            st.download_button(
-                "Download JSON Tree",
-                data,
-                file_name="transmission_tree.json",
-                mime="application/json",
-            )
-
-        else:
-            html_str = fig.to_html(full_html=True, include_plotlyjs="cdn")
-            st.download_button(
-                "Download Interactive HTML",
-                html_str,
-                file_name="transmission_tree.html",
-                mime="text/html",
-            )
-            st.info("""
-            **How to export PNG/SVG from the HTML file:**
-            1. Open the downloaded HTML file in any browser.
-            2. Use the Plotly camera icon (Save as PNG/SVG).
-            """)
+    st.subheader("Generation Timing")
+    st.dataframe(timing_df, use_container_width=True)
 
 # ============================================================
 # 3. SEIR MODEL
 # ============================================================
 else:
 
-    st.subheader("SEIR Model (Susceptible → Exposed → Infectious → Recovered)")
+    st.subheader("SEIR Model")
 
-    st.markdown("""
-### **SEIR Key**
-- **S** — Susceptible  
-- **E** — Exposed (infected but not yet infectious)  
-- **I** — Infectious  
-- **R** — Recovered/Removed  
-""")
-
-    incubation = st.slider("Incubation period (days)", 1, 10, 4)
-    infectious_period = st.slider("Infectious period (days)", 1, 14, 6)
-    days = st.slider("Simulation duration (days)", 30, 200, 100)
+    days = st.slider("Simulation Duration (days)", 30, 200, 100)
 
     N = 1_000_000
     I0, E0 = 10, 5
     S0 = N - I0 - E0
 
-    beta = Re / infectious_period
-    sigma = 1 / incubation
-    gamma = 1 / infectious_period
+    beta = Re / infectious_days
+    sigma = 1 / incubation_days
+    gamma = 1 / infectious_days
 
     S, E, I, R = [S0], [E0], [I0], [0]
 
@@ -438,15 +260,14 @@ else:
 
     chart = (
         alt.Chart(df.reset_index())
+        .transform_fold(["S", "E", "I", "R"])
         .mark_line()
         .encode(
-            x="index",
+            x="index:Q",
             y="value:Q",
-            color="variable:N"
+            color="key:N"
         )
-        .transform_fold(["S", "E", "I", "R"])
         .properties(height=500)
     )
 
     st.altair_chart(chart, use_container_width=True)
-
