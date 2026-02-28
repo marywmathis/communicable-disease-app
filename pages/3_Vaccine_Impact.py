@@ -300,7 +300,7 @@ with tab3:
         return G
 
     G = generate_tree(Re)
-    pos = nx.kamada_kawai_layout(G)
+    pos = nx.circular_layout(G)
 
     # Edges
     edge_x, edge_y = [], []
@@ -348,6 +348,7 @@ with tab3:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 
