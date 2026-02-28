@@ -14,6 +14,8 @@ import math
 # BASELINE R₀ VALUES FOR DISEASES
 # =============================================================================
 disease_r0 = {
+
+    # Vaccine-preventable diseases
     "Measles (MMR)": 15,
     "Pertussis (DTaP)": 12,
     "Polio (IPV)": 6,
@@ -22,6 +24,15 @@ disease_r0 = {
     "HPV": 3,
     "Hib": 1.3,
     "Pneumococcal (PCV)": 2,
+
+    # COVID-19 Variants
+    "COVID-19 (Original Wuhan 2020)": 2.5,
+    "COVID-19 (Alpha Variant)": 4,
+    "COVID-19 (Delta Variant)": 6.5,
+    "COVID-19 (Omicron BA.1)": 9,
+    "COVID-19 (Omicron BA.5)": 12,
+    "COVID-19 (Omicron XBB/BQ)": 13,
+}
 }
 
 # =============================================================================
@@ -340,4 +351,5 @@ with tab3:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
 
