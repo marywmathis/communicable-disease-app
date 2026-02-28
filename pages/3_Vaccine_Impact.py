@@ -14,7 +14,6 @@ import math
 # BASELINE R₀ VALUES FOR DISEASES
 # =============================================================================
 disease_r0 = {
-
     # Vaccine-preventable diseases
     "Measles (MMR)": 15,
     "Pertussis (DTaP)": 12,
@@ -33,8 +32,6 @@ disease_r0 = {
     "COVID-19 (Omicron BA.5)": 12,
     "COVID-19 (Omicron XBB/BQ)": 13,
 }
-}
-
 # =============================================================================
 # REAL-WORLD VACCINATION PRESETS
 # =============================================================================
@@ -351,5 +348,6 @@ with tab3:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 
