@@ -117,6 +117,33 @@ if mode == "Animated Spread (Click to Advance)":
     st.altair_chart(chart, use_container_width=True)
     st.metric("Total Infected", f"{int(infected[-1]):,}")
 
+# ---------------------------------------------------
+# GENERATION TIMING MODEL
+# ---------------------------------------------------
+
+st.markdown("### Generation Timing Model")
+
+# Use same sliders as SEIR if available
+incubation = st.slider("Incubation Period (days)", 1, 14, 4, key="tree_incubation")
+infectious_period = st.slider("Infectious Period (days)", 1, 20, 6, key="tree_infectious")
+
+generation_interval = incubation + (infectious_period / 2)
+
+st.info(f"Estimated Generation Interval: **{generation_interval:.1f} days**")
+
+max_generation = max(node_gen)
+
+generation_days = {
+    g: round(g * generation_interval, 1)
+    for g in range(max_generation + 1)
+}
+
+timing_df = pd.DataFrame({
+    "Generation": list(generation_days.keys()),
+    "Approx Days Since Index Case": list(generation_days.values())
+})
+
+st.dataframe(timing_df, use_container_width=True)
 # ============================================================
 # 2. NODE TREE SPREAD MODE
 # ============================================================
@@ -422,3 +449,4 @@ else:
     )
 
     st.altair_chart(chart, use_container_width=True)
+
